@@ -41,7 +41,9 @@ UdpSocket::UdpSocket(
   m_udp_socket(ctx.ios()),
   m_remote_endpoint(boost::asio::ip::address::from_string(remote_ip), remote_port),
   m_host_endpoint(boost::asio::ip::address::from_string(host_ip), host_port),
-  m_recv_buffer_size(recv_buffer_size)
+  m_any_endpoint(boost::asio::ip::address::from_string("0.0.0.0"), host_port),
+  m_recv_buffer_size(recv_buffer_size),
+  m_use_multicast(false)
 {
   m_remote_endpoint = remote_ip.empty() ?
     boost::asio::ip::udp::endpoint{boost::asio::ip::udp::v4(), remote_port} :
@@ -98,7 +100,7 @@ size_t UdpSocket::receive(std::vector<uint8_t> & buff)
 
   std::size_t len = m_udp_socket.receive_from(
     boost::asio::buffer(buff),
-    m_host_endpoint,
+    sender_endpoint,
     0,
     error);
 
@@ -121,13 +123,29 @@ void UdpSocket::asyncSend(std::vector<uint8_t> & buff)
 
 void UdpSocket::asyncReceive(Functor func)
 {
+  boost::asio::ip::udp::endpoint sender_endpoint;
+
   m_func = std::move(func);
   m_udp_socket.async_receive_from(
     boost::asio::buffer(m_recv_buffer),
-    m_host_endpoint,
+    sender_endpoint,
     [this](boost::system::error_code error, std::size_t bytes_transferred)
     {
       asyncReceiveHandler(error, bytes_transferred);
+    });
+}
+
+void UdpSocket::asyncReceiveWithSender(FunctorWithSender func)
+{
+  boost::asio::ip::udp::endpoint sender_endpoint;
+
+  m_func_with_sender = std::move(func);
+  m_udp_socket.async_receive_from(
+    boost::asio::buffer(m_recv_buffer),
+    sender_endpoint,
+    [this, &sender_endpoint](boost::system::error_code error, std::size_t bytes_transferred)
+    {
+      asyncReceiveHandler(error, bytes_transferred, sender_endpoint.address().to_string());
     });
 }
 
@@ -162,6 +180,32 @@ void UdpSocket::asyncReceiveHandler(
       {
         m_recv_buffer.resize(bytes_tf);
         asyncReceiveHandler(error, bytes_tf);
+      });
+  }
+}
+
+void UdpSocket::asyncReceiveHandler(
+  const boost::system::error_code & error,
+  std::size_t bytes_transferred,
+  const std::string & sender_ip)
+{
+  (void)bytes_transferred;
+  if (error) {
+    RCLCPP_ERROR_STREAM(rclcpp::get_logger("UdpSocket::asyncReceiveHandler"), error.message());
+    return;
+  }
+
+  if (bytes_transferred > 0 && m_func_with_sender) {
+    m_recv_buffer.resize(bytes_transferred);
+    m_func_with_sender(m_recv_buffer, sender_ip);
+    m_recv_buffer.resize(m_recv_buffer_size);
+    m_udp_socket.async_receive_from(
+      boost::asio::buffer(m_recv_buffer),
+      m_host_endpoint,
+      [this, sender_ip](boost::system::error_code error, std::size_t bytes_tf)
+      {
+        m_recv_buffer.resize(bytes_tf);
+        asyncReceiveHandler(error, bytes_tf, sender_ip);
       });
   }
 }
@@ -208,7 +252,17 @@ bool UdpSocket::isOpen() const
 
 void UdpSocket::bind()
 {
-  m_udp_socket.bind(m_host_endpoint);
+  if (m_use_multicast) {
+    m_udp_socket.bind(m_any_endpoint);
+    m_udp_socket.set_option(boost::asio::ip::multicast::join_group(m_remote_endpoint.address().to_v4(), m_host_endpoint.address().to_v4()));
+  } else { 
+    m_udp_socket.bind(m_host_endpoint);
+  }  
+}
+
+void UdpSocket::setMulticast(bool value)
+{
+  m_use_multicast = value;
 }
 
 }  // namespace udp_driver
