@@ -101,10 +101,9 @@ private:
     const boost::system::error_code & error,
     std::size_t bytes_transferred);
 
-  void asyncReceiveHandler(
+  void asyncReceiveHandler2(
     const boost::system::error_code & error,
-    std::size_t bytes_transferred,
-    const std::string & sender_ip);
+    std::size_t bytes_transferred);
 
 private:
   const drivers::common::IoContext & m_ctx;
@@ -118,6 +117,8 @@ private:
   size_t m_recv_buffer_size;
   bool m_use_multicast;
   std::vector<uint8_t> m_recv_buffer;
+
+  boost::asio::ip::udp::endpoint sender_endpoint_;
 };
 
 }  // namespace udp_driver

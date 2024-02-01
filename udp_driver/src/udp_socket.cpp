@@ -137,15 +137,14 @@ void UdpSocket::asyncReceive(Functor func)
 
 void UdpSocket::asyncReceiveWithSender(FunctorWithSender func)
 {
-  boost::asio::ip::udp::endpoint sender_endpoint;
-
   m_func_with_sender = std::move(func);
   m_udp_socket.async_receive_from(
     boost::asio::buffer(m_recv_buffer),
-    sender_endpoint,
-    [this, &sender_endpoint](boost::system::error_code error, std::size_t bytes_transferred)
+    sender_endpoint_,
+    [this](boost::system::error_code error, std::size_t bytes_transferred)
     {
-      asyncReceiveHandler(error, bytes_transferred, sender_endpoint.address().to_string());
+      std::cout << "asyncReceiveWithSender" << std::endl << std::endl;
+      asyncReceiveHandler2(error, bytes_transferred);
     });
 }
 
@@ -184,10 +183,9 @@ void UdpSocket::asyncReceiveHandler(
   }
 }
 
-void UdpSocket::asyncReceiveHandler(
+void UdpSocket::asyncReceiveHandler2(
   const boost::system::error_code & error,
-  std::size_t bytes_transferred,
-  const std::string & sender_ip)
+  std::size_t bytes_transferred)
 {
   (void)bytes_transferred;
   if (error) {
@@ -197,15 +195,15 @@ void UdpSocket::asyncReceiveHandler(
 
   if (bytes_transferred > 0 && m_func_with_sender) {
     m_recv_buffer.resize(bytes_transferred);
-    m_func_with_sender(m_recv_buffer, sender_ip);
+    m_func_with_sender(m_recv_buffer, sender_endpoint_.address().to_string());
     m_recv_buffer.resize(m_recv_buffer_size);
     m_udp_socket.async_receive_from(
       boost::asio::buffer(m_recv_buffer),
-      m_host_endpoint,
-      [this, sender_ip](boost::system::error_code error, std::size_t bytes_tf)
+      sender_endpoint_,
+      [this](boost::system::error_code error, std::size_t bytes_tf)
       {
         m_recv_buffer.resize(bytes_tf);
-        asyncReceiveHandler(error, bytes_tf, sender_ip);
+        asyncReceiveHandler2(error, bytes_tf);
       });
   }
 }
