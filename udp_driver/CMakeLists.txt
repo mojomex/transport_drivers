@@ -31,6 +31,7 @@ find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
 find_package(Boost REQUIRED)
+find_package(nebula_common REQUIRED)
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/udp_socket.cpp

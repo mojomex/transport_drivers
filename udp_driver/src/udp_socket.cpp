@@ -22,6 +22,8 @@
 #include <system_error>
 #include <vector>
 
+#include <nebula_common/util/instrumentation.hpp>
+
 #include "boost/asio.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -162,6 +164,8 @@ void UdpSocket::asyncReceiveHandler(
   const boost::system::error_code & error,
   std::size_t bytes_transferred)
 {
+  static nebula::util::Instrumentation instr_{"asyncReceiveHandler"};
+  instr_.tick();
   (void)bytes_transferred;
   if (error) {
     RCLCPP_ERROR_STREAM(rclcpp::get_logger("UdpSocket::asyncReceiveHandler"), error.message());
@@ -181,6 +185,7 @@ void UdpSocket::asyncReceiveHandler(
         asyncReceiveHandler(error, bytes_tf);
       });
   }
+  instr_.tock();
 }
 
 void UdpSocket::asyncReceiveHandler2(
