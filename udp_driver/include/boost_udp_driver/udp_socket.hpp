@@ -73,7 +73,7 @@ public:
    * socket` for more information.
    *
    * @param n_bytes The number of bytes to allocate.
-   * @return true If the buffer has been resizes successfully.
+   * @return true If the buffer has been resized successfully.
    * @return false If there was an error, such as the `net.core.rmem_max` value being exceeded.
    */
   bool setKernelBufferSize(int32_t n_bytes);
