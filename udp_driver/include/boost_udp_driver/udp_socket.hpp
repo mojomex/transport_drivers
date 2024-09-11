@@ -19,7 +19,6 @@
 
 #include "boost_io_context/io_context.hpp"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
